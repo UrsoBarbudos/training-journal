@@ -1,0 +1,11 @@
+{
+  "name": "Training Journal",
+  "short_name": "Journal",
+  "description": "Локальный журнал тренировок",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f1e8",
+  "theme_color": "#f5f1e8"
+}

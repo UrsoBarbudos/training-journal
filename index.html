@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f5f1e8">
+    <meta name="description" content="Локальный журнал тренировок">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Journal">
+    <title>Training Journal</title>
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="stylesheet" href="./assets/phosphor.css">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="home-header">
+        <p class="brand-mark">TJ / 01</p>
+        <h1>Журнал тренировок</h1>
+      </header>
+      <main id="app" tabindex="-1">
+        <section aria-labelledby="calendar-title">
+          <div id="calendar"></div>
+          <button id="new-workout" class="button button-primary home-cta" type="button">
+            <i class="ph ph-plus" aria-hidden="true"></i>Новая тренировка
+          </button>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="import-dialog" class="sheet-dialog">
+      <form id="import-form" class="sheet-content">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <div class="sheet-heading">
+          <div><p class="eyebrow">Новая тренировка</p><h2>Вставьте план из чата</h2></div>
+          <button class="icon-button" type="button" data-close="import-dialog" aria-label="Закрыть"><i class="ph ph-x" aria-hidden="true"></i></button>
+        </div>
+        <label class="field-label" for="plan-text">План тренировки</label>
+        <textarea id="plan-text" rows="12" placeholder="# День A — Спина + бицепс&#10;&#10;## 1. Упражнение&#10;**30×12 ×3**"></textarea>
+        <p id="import-error" class="form-error" aria-live="assertive"></p>
+        <button class="button button-primary" type="submit">Добавить тренировку</button>
+      </form>
+    </dialog>
+
+    <dialog id="workout-dialog" class="workout-dialog">
+      <form id="workout-form" class="workout-form">
+        <header class="workout-header">
+          <button class="header-square" type="button" data-close="workout-dialog" aria-label="Вернуться к календарю"><i class="ph ph-caret-left" aria-hidden="true"></i></button>
+          <div class="workout-heading-copy"><h2 id="workout-title">День A</h2><p id="workout-date">01.09.26</p></div>
+          <button id="undo-action" class="header-square undo-button" type="button" aria-label="Отменить последнее действие" disabled><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i></button>
+        </header>
+
+        <section id="timer-panel" class="timer-panel" aria-label="Таймер отдыха">
+          <span class="timer-label">Отдых</span>
+          <div id="timer-idle" class="timer-presets">
+            <button type="button" data-timer-seconds="90">1:30</button>
+            <button type="button" data-timer-seconds="180">3:00</button>
+            <button type="button" id="custom-timer-open">Другое</button>
+          </div>
+          <div id="timer-running" class="timer-running" hidden>
+            <strong id="timer-value">01:30</strong>
+            <button id="timer-cancel" type="button">Отменить</button>
+          </div>
+        </section>
+
+        <section id="exercise-list" class="exercise-list" aria-label="Упражнения"></section>
+        <section id="first-exercise-empty" class="first-exercise-empty" hidden>
+          <p>В тренировке пока нет упражнений.</p>
+          <button id="add-first-exercise" class="button button-secondary" type="button">Добавить первое упражнение</button>
+        </section>
+        <p id="save-state" class="save-state" aria-live="polite"></p>
+        <button id="finish-workout" class="finish-workout" type="submit">Завершить тренировку</button>
+      </form>
+    </dialog>
+
+    <dialog id="custom-timer-dialog" class="sheet-dialog compact-sheet">
+      <form id="custom-timer-form" class="sheet-content">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <div class="sheet-heading">
+          <div><p class="eyebrow">Таймер отдыха</p><h2>Своё время</h2></div>
+          <button class="icon-button" type="button" data-close="custom-timer-dialog" aria-label="Закрыть"><i class="ph ph-x" aria-hidden="true"></i></button>
+        </div>
+        <div class="custom-time-fields">
+          <label>Минуты<input id="custom-minutes" type="number" min="0" max="99" inputmode="numeric" value="0"></label>
+          <span>:</span>
+          <label>Секунды<input id="custom-seconds" type="number" min="0" max="59" inputmode="numeric" value="0"></label>
+        </div>
+        <button id="custom-timer-start" class="button button-primary" type="submit" disabled>Запустить</button>
+      </form>
+    </dialog>
+
+    <dialog id="exercise-menu-dialog" class="action-dialog">
+      <div class="action-content">
+        <p id="exercise-menu-name" class="eyebrow"></p>
+        <button type="button" data-exercise-action="add"><i class="ph ph-plus" aria-hidden="true"></i>Добавить упражнение</button>
+        <button type="button" data-exercise-action="replace"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i>Заменить упражнение</button>
+        <button type="button" data-exercise-action="skip"><i class="ph ph-skip-forward" aria-hidden="true"></i>Пропустить упражнение</button>
+        <button type="button" data-close="exercise-menu-dialog">Отмена</button>
+      </div>
+    </dialog>
+
+    <dialog id="post-dialog" class="sheet-dialog">
+      <form id="post-form" class="sheet-content">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <div class="sheet-heading">
+          <div><p class="eyebrow">После тренировки</p><h2>Как чувствует себя поясница?</h2></div>
+          <button class="icon-button" type="button" data-close="post-dialog" aria-label="Закрыть"><i class="ph ph-x" aria-hidden="true"></i></button>
+        </div>
+        <div class="post-grid">
+          <label>Боль, 0–10<input id="post-pain" type="number" min="0" max="10" inputmode="decimal" value="0"></label>
+          <label>Дискомфорт, 0–10<input id="post-discomfort" type="number" min="0" max="10" inputmode="decimal" value="0"></label>
+        </div>
+        <label>Мобильность<select id="post-mobility"><option value="">Не отмечена</option><option value="better">Стала лучше</option><option value="same">Без изменений</option><option value="worse">Стала хуже</option></select></label>
+        <label id="problem-exercise-label" hidden>Проблемное упражнение<select id="problem-exercise"></select></label>
+        <label>Общее замечание<textarea id="post-notes" rows="3" placeholder="Как прошла тренировка"></textarea></label>
+        <button class="button button-primary" type="submit">Сохранить и собрать журнал</button>
+      </form>
+    </dialog>
+
+    <dialog id="summary-dialog" class="sheet-dialog">
+      <div class="sheet-content summary-content">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <div class="sheet-heading">
+          <div><p class="eyebrow">Тренировка завершена</p><h2>Журнал для чата</h2></div>
+          <button class="icon-button" type="button" data-close="summary-dialog" aria-label="Закрыть"><i class="ph ph-x" aria-hidden="true"></i></button>
+        </div>
+        <textarea id="summary-text" rows="18" readonly></textarea>
+        <button id="copy-summary" class="button button-primary" type="button"><i class="ph ph-copy" aria-hidden="true"></i>Копировать журнал</button>
+        <p id="copy-state" class="copy-state" aria-live="polite"></p>
+      </div>
+    </dialog>
+
+    <dialog id="lock-dialog" class="lock-dialog">
+      <form id="lock-form" class="lock-content">
+        <p class="eyebrow">Training Journal</p>
+        <h2 id="lock-title">Разблокировка</h2>
+        <p id="lock-description">Введите локальный PIN-код.</p>
+        <label>PIN-код<input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" minlength="6" autocomplete="off" required placeholder="Не менее 6 цифр"></label>
+        <label id="pin-confirm-label" hidden>Повторите PIN-код<input id="pin-confirm" type="password" inputmode="numeric" pattern="[0-9]*" minlength="6" autocomplete="off" placeholder="Введите PIN ещё раз"></label>
+        <p id="lock-error" class="form-error" aria-live="assertive"></p>
+        <button id="lock-submit" class="button button-primary" type="submit">Разблокировать</button>
+        <p class="security-note">PIN действует только на этом устройстве.</p>
+      </form>
+    </dialog>
+
+    <script src="./db.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

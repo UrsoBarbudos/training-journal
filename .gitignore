@@ -1,1 +1,9 @@
 .DS_Store
+.audit/
+design-qa.md
+design-qa-comparison.html
+design-qa-*.png
+design-qa-*.jpg
+implementation-*.png
+implementation-*.jpg
+reference-*.png
