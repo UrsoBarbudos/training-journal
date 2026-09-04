@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "title": "День A",
+  "date": "2026-09-04",
+  "type": "A",
+  "exercises": [
+    {
+      "name": "Одноручная тяга гантели с опорой",
+      "warmupSets": [{ "weight": 12, "reps": 15 }],
+      "sets": [
+        { "weight": 23, "reps": 15 },
+        { "weight": 23, "reps": 15 },
+        { "weight": 23, "reps": 15 },
+        { "weight": 23, "reps": 15 }
+      ],
+      "rpe": 7,
+      "notes": ""
+    },
+    {
+      "name": "TRX Row",
+      "warmupSets": [],
+      "sets": [
+        { "weight": null, "reps": 15 },
+        { "weight": null, "reps": 15 },
+        { "weight": null, "reps": 15 },
+        { "weight": null, "reps": 15 }
+      ],
+      "rpe": 7,
+      "notes": ""
+    },
+    {
+      "name": "Степпер",
+      "warmupSets": [],
+      "sets": [],
+      "durationMinutes": 25,
+      "rpe": 5,
+      "notes": ""
+    }
+  ]
+}

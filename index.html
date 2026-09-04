@@ -37,7 +37,8 @@
           <button class="icon-button" type="button" data-close="import-dialog" aria-label="Закрыть"><i class="ph ph-x" aria-hidden="true"></i></button>
         </div>
         <label class="field-label" for="plan-text">План тренировки</label>
-        <textarea id="plan-text" rows="12" placeholder="# День A — Спина + бицепс&#10;&#10;## 1. Упражнение&#10;**30×12 ×3**"></textarea>
+        <textarea id="plan-text" rows="12" placeholder="Вставьте JSON тренировки из ChatGPT или старый текстовый план." aria-describedby="import-hint"></textarea>
+        <p id="import-hint" class="eyebrow">Вставьте JSON тренировки из ChatGPT или старый текстовый план.</p>
         <p id="import-error" class="form-error" aria-live="assertive"></p>
         <button class="button button-primary" type="submit">Добавить тренировку</button>
       </form>
@@ -145,6 +146,7 @@
     </dialog>
 
     <script src="./db.js"></script>
+    <script src="./plan-import.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

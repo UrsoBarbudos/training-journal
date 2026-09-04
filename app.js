@@ -166,10 +166,11 @@
         const plan = exercise.plan || {};
         const fallbackSets = Array.from({ length: Number(plan.sets) || 0 }, () => ({ weight: displayNumber(plan.weight), reps: displayNumber(plan.reps) }));
         return {
+          ...exercise,
           id: exercise.id || crypto.randomUUID(),
           name: exercise.name || "",
           warmupSets: warmupSets.map(normalizeSet),
-          sets: (workingSets.length ? workingSets : fallbackSets).map(normalizeSet),
+          sets: (workingSets.length || Object.hasOwn(exercise, "durationMinutes") ? workingSets : fallbackSets).map(normalizeSet),
           rpe: displayNumber(exercise.rpe ?? exercise.feedback?.rpe),
           notes: exercise.notes || "",
           instruction: exercise.instruction || "",
@@ -243,17 +244,25 @@
     const text = document.querySelector("#plan-text").value.trim();
     const error = document.querySelector("#import-error");
     if (!text) { error.textContent = "Вставьте план тренировки."; return; }
-    const parsed = parsePlan(text, state.selectedDate);
+    error.textContent = "";
+    let parsed;
+    try { parsed = parseImportedPlan(text, state.selectedDate); }
+    catch (cause) { error.textContent = cause.message; return; }
     if (!parsed.exercises.length) { error.textContent = "Не удалось найти упражнения. Проверьте заголовки вида «## 1. Упражнение»."; return; }
     const now = new Date().toISOString();
     const workout = normalizeWorkout({ id: crypto.randomUUID(), date: parsed.date, title: parsed.title, type: parsed.type, status: "active", exercises: parsed.exercises, skipped: [], post: {}, sourceText: text, createdAt: now, updatedAt: now });
-    await db.put("workouts", workout);
+    try { await db.put("workouts", workout); }
+    catch (cause) { error.textContent = "Не удалось сохранить тренировку на устройстве. Попробуйте ещё раз."; return; }
     await refreshWorkouts();
     state.selectedDate = workout.date;
     state.month = startOfMonth(fromISODate(workout.date));
     renderCalendar();
     document.querySelector("#import-dialog").close();
     openWorkout(workout);
+  }
+
+  function parseImportedPlan(text, fallbackDate) {
+    return window.TrainingJournalImport.parseJSONPlan(text) ?? parsePlan(text, fallbackDate);
   }
 
   function parsePlan(text, fallbackDate) {
@@ -359,6 +368,7 @@
         <div class="set-list">${rows}</div>
         <button class="add-set" type="button" data-add-set>＋ Добавить подход</button>
         <div class="exercise-meta">
+          ${Object.hasOwn(exercise, "durationMinutes") ? `<label>Длительность, мин<input data-exercise-field="durationMinutes" inputmode="decimal" value="${escapeAttribute(displayNumber(exercise.durationMinutes))}" placeholder="—"></label>` : ""}
           <label>RPE<input data-exercise-field="rpe" inputmode="decimal" value="${escapeAttribute(exercise.rpe)}" placeholder="—"></label>
           <label>Заметка<textarea data-exercise-field="notes" rows="1" placeholder="Добавить заметку…">${escapeHTML(exercise.notes)}</textarea></label>
         </div>
@@ -385,7 +395,8 @@
     const exercise = card && findExercise(card.dataset.exerciseId);
     if (!exercise) return;
     if (event.target.dataset.exerciseField) {
-      exercise[event.target.dataset.exerciseField] = event.target.value;
+      const field = event.target.dataset.exerciseField;
+      exercise[field] = field === "durationMinutes" ? normalizeNumericText(event.target.value) : event.target.value;
     } else if (event.target.dataset.setId) {
       const set = exercise.warmupSets.find((item) => item.id === event.target.dataset.setId);
       if (set) set[event.target.dataset.field] = normalizeNumericText(event.target.value);
@@ -641,12 +652,13 @@
     const completedExercises = workout.exercises.filter((exercise) => {
       const hasWarmup = exercise.warmupSets.some(hasSetValue);
       const hasWorkingSet = exercise.sets.some(hasSetValue);
-      return exercise.name && (hasWarmup || hasWorkingSet || exercise.rpe !== "" || exercise.notes);
+      return exercise.name && (hasWarmup || hasWorkingSet || displayNumber(exercise.durationMinutes) !== "" || exercise.rpe !== "" || exercise.notes);
     });
     completedExercises.forEach((exercise, index) => {
       lines.push(`## ${index + 1}. ${exercise.name}`, "");
       exercise.warmupSets.filter(hasSetValue).forEach((set) => lines.push(`Разминка: ${formatSet(set)}`));
       exercise.sets.filter(hasSetValue).forEach((set, setIndex) => lines.push(`${setIndex + 1}. ${formatSet(set)}`));
+      if (displayNumber(exercise.durationMinutes) !== "") lines.push(`Длительность: ${displayNumber(exercise.durationMinutes)} мин`);
       if (exercise.instruction) lines.push(`Уточнение: ${exercise.instruction}`);
       if (exercise.rpe !== "") lines.push(`RPE: ${exercise.rpe}`);
       if (exercise.notes) lines.push(`Заметка: ${exercise.notes}`);
