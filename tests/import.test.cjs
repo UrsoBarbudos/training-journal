@@ -46,7 +46,8 @@ test('точное число подходов, отдельная размин�
   const trxHTML = app.renderExercise(result.exercises[1], 1);
   assert.match(trxHTML, /data-field="weight"[^>]*value=""/);
   assert.match(trxHTML, /data-field="reps"[^>]*value="15"/);
-  assert.match(app.renderExercise(result.exercises[2], 2), /data-exercise-field="durationMinutes"[^>]*value="25"/);
+  assert.doesNotMatch(app.renderExercise(result.exercises[2], 2), /data-exercise-field="durationMinutes"/);
+  assert.match(app.renderExercise(result.exercises[2], 2), /<div class="set-head"><span>Подход<\/span><span>Вес, кг<\/span>/);
 });
 test('reps=null, дробный вес, RPE и заметки', () => {
   const value = fresh();

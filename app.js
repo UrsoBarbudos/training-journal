@@ -351,24 +351,20 @@
   }
 
   function renderExercise(exercise, index) {
-    const warmup = exercise.warmupSets.map((set, setIndex) => `<div class="warmup-row"><span class="eyebrow">Разминка${exercise.warmupSets.length > 1 ? ` ${setIndex + 1}` : ""}</span><input data-kind="warmup" data-field="weight" data-set-id="${set.id}" inputmode="decimal" value="${escapeAttribute(set.weight)}" aria-label="Вес разминки"><span>кг</span><span>×</span><input data-kind="warmup" data-field="reps" data-set-id="${set.id}" inputmode="numeric" value="${escapeAttribute(set.reps)}" aria-label="Повторения разминки"><span></span></div>`).join("");
     const rows = exercise.sets.map((set, setIndex) => renderSetRow(set, setIndex)).join("");
     const nameReadonly = exercise.name ? " readonly" : "";
     return `<article class="exercise-card" data-exercise-id="${exercise.id}">
       <div class="exercise-header">
         <button class="drag-handle" type="button" aria-label="Изменить порядок упражнения"><i class="ph ph-dots-six-vertical" aria-hidden="true"></i></button>
         <span class="exercise-index">${String(index + 1).padStart(2, "0")}</span>
-        <input class="exercise-name" data-exercise-field="name" value="${escapeAttribute(exercise.name)}" placeholder="Название упражнения"${nameReadonly}>
+        <textarea class="exercise-name" data-exercise-field="name" rows="1" placeholder="Название упражнения"${nameReadonly}>${escapeHTML(exercise.name)}</textarea>
         <button class="exercise-menu-button" type="button" data-open-menu aria-label="Меню упражнения"><i class="ph ph-dots-three" aria-hidden="true"></i></button>
       </div>
       <div class="exercise-body">
-        ${warmup}
-        ${exercise.instruction ? `<p class="eyebrow">${escapeHTML(exercise.instruction)}</p>` : ""}
         <div class="set-head"><span>Подход</span><span>Вес, кг</span><span></span><span>Повторы</span></div>
         <div class="set-list">${rows}</div>
         <button class="add-set" type="button" data-add-set>＋ Добавить подход</button>
         <div class="exercise-meta">
-          ${Object.hasOwn(exercise, "durationMinutes") ? `<label>Длительность, мин<input data-exercise-field="durationMinutes" inputmode="decimal" value="${escapeAttribute(displayNumber(exercise.durationMinutes))}" placeholder="—"></label>` : ""}
           <label>RPE<input data-exercise-field="rpe" inputmode="decimal" value="${escapeAttribute(exercise.rpe)}" placeholder="—"></label>
           <label>Заметка<textarea data-exercise-field="notes" rows="1" placeholder="Добавить заметку…">${escapeHTML(exercise.notes)}</textarea></label>
         </div>

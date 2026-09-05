@@ -1,4 +1,4 @@
-const CACHE_NAME = "training-journal-shell-v18";
+const CACHE_NAME = "training-journal-shell-v19";
 const APP_SHELL = ["./", "./index.html", "./styles.css", "./db.js", "./plan-import.js", "./app.js", "./manifest.webmanifest", "./assets/phosphor.css", "./assets/Phosphor.woff2", "./assets/paper-grain.png"];
 
 self.addEventListener("install", (event) => {
