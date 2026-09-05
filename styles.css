@@ -55,7 +55,7 @@ main { padding: 0 18px calc(28px + env(safe-area-inset-bottom)); }
 dialog { color: var(--ink); }
 dialog::backdrop { background: rgb(34 31 26 / 32%); }
 .workout-dialog { width: min(100%, 520px); height: 100dvh; max-width: 520px; max-height: 100dvh; margin: auto; padding: 0; border: 0; border-radius: 0; background-color: var(--paper); background-image: var(--texture); background-size: 512px 512px; }
-.workout-form { min-height: 100%; padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
+.workout-form { display: flex; flex-direction: column; min-height: 100%; }
 .workout-header { position: sticky; top: 0; z-index: 8; display: grid; grid-template-columns: 58px 1fr 58px; align-items: center; min-height: calc(66px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); border-bottom: 1px solid var(--line-soft); background-color: rgb(245 241 232 / 97%); background-image: var(--texture); background-size: 512px 512px; }
 .header-square { width: 46px; height: 46px; margin-left: 16px; border: 1px solid var(--ink); }
 .undo-button { margin-right: 16px; margin-left: auto; border: 0; }
@@ -112,7 +112,7 @@ dialog::backdrop { background: rgb(34 31 26 / 32%); }
 .first-exercise-empty { padding: 48px 18px; text-align: center; }
 .first-exercise-empty p { color: var(--muted); font-size: .74rem; }
 .save-state { min-height: 22px; margin: 0; padding: 10px 18px; color: var(--muted); font-size: .58rem; text-align: right; }
-.finish-workout { position: fixed; z-index: 10; right: 14px; bottom: calc(10px + env(safe-area-inset-bottom)); left: 14px; width: min(calc(100% - 28px), 492px); min-height: 60px; margin: auto; padding: 10px 18px; border: 0; border-radius: 5px; background: var(--ink); color: var(--paper); font-size: .78rem; font-weight: 750; letter-spacing: .075em; text-transform: uppercase; box-shadow: 0 4px 18px rgb(23 24 22 / 16%); }
+.finish-workout { width: 100%; min-height: calc(60px + env(safe-area-inset-bottom)); margin-top: auto; padding: 10px 18px calc(10px + env(safe-area-inset-bottom)); border: 0; border-radius: 0; background: var(--ink); color: var(--paper); font-size: .78rem; font-weight: 750; letter-spacing: .075em; text-transform: uppercase; }
 .exercise-card.is-dragging { z-index: 20; opacity: .74; box-shadow: 0 8px 28px rgb(23 24 22 / 18%); }
 
 .sheet-dialog { width: min(100%, 520px); max-width: 520px; max-height: calc(100dvh - 32px); margin: auto auto 0; padding: 0; border: 0; border-radius: 14px 14px 0 0; background-color: var(--paper); background-image: var(--texture); background-size: 512px 512px; }
@@ -151,7 +151,7 @@ label { display: grid; gap: 7px; color: var(--muted); font-size: .61rem; font-we
 @media (min-width: 560px) {
   .app-shell { min-height: calc(100vh - 40px); margin-block: 20px; border: 1px solid rgb(23 24 22 / 18%); border-radius: 34px; overflow: hidden; box-shadow: 0 18px 55px rgb(68 56 42 / 12%); }
   .workout-dialog { height: calc(100dvh - 40px); border: 1px solid rgb(23 24 22 / 18%); border-radius: 34px; overflow: hidden; }
-  .finish-workout { bottom: 30px; }
+  .finish-workout { border-radius: 0 0 34px 34px; }
 }
 
 @media (max-width: 400px) {
