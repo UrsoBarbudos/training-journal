@@ -25,10 +25,13 @@ input[type="number"]::-webkit-outer-spin-button { margin: 0; -webkit-appearance:
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 .app-shell { width: min(100%, 520px); min-height: 100vh; margin: 0 auto; background-color: var(--paper); background-image: var(--texture); background-size: 512px 512px; }
-.home-header { padding: calc(24px + env(safe-area-inset-top)) 18px 18px; border-bottom: 1px solid var(--line-soft); }
+.home-header { display: flex; align-items: center; justify-content: space-between; padding: calc(24px + env(safe-area-inset-top)) 18px 18px; border-bottom: 1px solid var(--line-soft); }
 .brand-mark { margin: 0 0 8px; color: var(--muted); font-size: .62rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 .home-header h1 { margin: 0; font-size: .98rem; letter-spacing: .055em; text-transform: uppercase; }
 main { padding: 0 18px calc(28px + env(safe-area-inset-bottom)); }
+.sync-bar { border-bottom: 1px solid var(--line-soft); }
+.sync-bar button { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 38px; padding: 0 18px; border: 0; background: transparent; color: var(--muted); font-size: .58rem; letter-spacing: .04em; }
+.sync-bar i { font-size: 1rem; }
 
 .calendar { margin: 0 -18px; border-bottom: 1px solid var(--line); }
 .calendar-header { display: flex; align-items: center; justify-content: space-between; min-height: 78px; padding: 0 18px; }
@@ -112,6 +115,7 @@ dialog::backdrop { background: rgb(34 31 26 / 32%); }
 .first-exercise-empty { padding: 48px 18px; text-align: center; }
 .first-exercise-empty p { color: var(--muted); font-size: .74rem; }
 .save-state { min-height: 22px; margin: 0; padding: 10px 18px; color: var(--muted); font-size: .58rem; text-align: right; }
+.delete-workout { min-height: 48px; margin: 4px 18px 14px; border: 1px solid var(--danger); background: transparent; color: var(--danger); font-size: .68rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
 .finish-workout { width: 100%; min-height: calc(60px + env(safe-area-inset-bottom)); margin-top: auto; padding: 10px 18px calc(10px + env(safe-area-inset-bottom)); border: 0; border-radius: 0; background: var(--ink); color: var(--paper); font-size: .78rem; font-weight: 750; letter-spacing: .075em; text-transform: uppercase; }
 .exercise-card.is-dragging { z-index: 20; opacity: .74; box-shadow: 0 8px 28px rgb(23 24 22 / 18%); }
 
@@ -147,6 +151,24 @@ label { display: grid; gap: 7px; color: var(--muted); font-size: .61rem; font-we
 .lock-content > p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: .72rem; line-height: 1.5; }
 .lock-content input { min-height: 44px; padding: 8px 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; font-size: 1rem; }
 .security-note { font-size: .58rem !important; text-align: center; }
+
+.workout-history { margin-top: 22px; }
+.workout-history h2 { margin: 0 0 10px; font-size: 1rem; }
+.history-card { display: grid; grid-template-columns: 1fr 44px; align-items: stretch; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgb(255 255 255 / 35%); }
+.history-open, .history-delete { border: 0; background: transparent; color: inherit; }
+.history-open { display: flex; justify-content: space-between; gap: 12px; padding: 13px; text-align: left; }
+.history-open span { color: var(--muted); white-space: nowrap; }
+.history-delete { border-left: 1px solid var(--line); font-size: 1.05rem; }
+.import-stats { margin: 4px 0 12px; }
+.import-stats div { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.import-stats dd { margin: 0; font-weight: 700; }
+.form-warning { padding: 10px; border-radius: 10px; background: #fff3cd; color: #694f00; }
+.general-warmup { margin-bottom: 18px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; }
+.general-warmup h3 { margin: 0 0 10px; font-size: .95rem; }
+.warmup-item { display: grid; grid-template-columns: 1fr 64px; gap: 8px; margin-bottom: 8px; }
+.warmup-item textarea { grid-column: 1 / -1; }
+.set-section-label { margin: 10px 0 6px; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.warmup-set-list { margin-bottom: 12px; }
 
 @media (min-width: 560px) {
   .app-shell { min-height: calc(100vh - 40px); margin-block: 20px; border: 1px solid rgb(23 24 22 / 18%); border-radius: 34px; overflow: hidden; box-shadow: 0 18px 55px rgb(68 56 42 / 12%); }

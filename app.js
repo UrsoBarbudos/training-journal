@@ -2,6 +2,7 @@
   "use strict";
 
   const db = window.TrainingJournalDB;
+  const sync = window.TrainingJournalSync;
   const TIMER_STORAGE_KEY = "training-journal-timer-end";
   const state = {
     workouts: [],
@@ -17,6 +18,7 @@
     cancelArmed: false,
     cancelArmTimer: null,
     drag: null,
+    pendingImport: null,
   };
 
   document.addEventListener("DOMContentLoaded", init);
@@ -26,9 +28,12 @@
     bindSecurity();
     try {
       await db.open();
+      await db.migrateExistingWorkoutsToQueue();
       await showSecurityGate();
       await refreshWorkouts();
       renderCalendar();
+      await sync.queueState();
+      sync.flush();
     } catch (error) {
       console.error(error);
       document.querySelector("#calendar").innerHTML = '<p class="form-error">Не удалось открыть локальный журнал. Обновите страницу.</p>';
@@ -40,13 +45,20 @@
   }
 
   function bindStaticActions() {
-    document.querySelector("#new-workout").addEventListener("click", () => openImport(state.selectedDate));
+    document.querySelector("#new-workout").addEventListener("click", pasteWorkout);
     document.querySelector("#import-form").addEventListener("submit", importPlan);
+    document.querySelector("#confirm-import").addEventListener("click", confirmImport);
     document.querySelector("#workout-form").addEventListener("submit", openPostWorkout);
     document.querySelector("#post-form").addEventListener("submit", finishWorkout);
     document.querySelector("#copy-summary").addEventListener("click", copySummary);
     document.querySelector("#add-first-exercise").addEventListener("click", () => addExerciseAfter(null));
     document.querySelector("#undo-action").addEventListener("click", undoLastAction);
+    document.querySelector("#delete-workout").addEventListener("click", deleteCurrentWorkout);
+    document.querySelector("#open-sync-settings").addEventListener("click", openSyncSettings);
+    document.querySelector("#sync-settings-form").addEventListener("submit", saveSyncSettings);
+    document.querySelector("#test-sync").addEventListener("click", testSyncSettings);
+    document.querySelector("#sync-now").addEventListener("click", () => sync.flush());
+    window.addEventListener("training-journal-sync", updateSyncState);
     document.querySelectorAll("[data-timer-seconds]").forEach((button) => button.addEventListener("click", () => startTimer(Number(button.dataset.timerSeconds))));
     document.querySelector("#custom-timer-open").addEventListener("click", openCustomTimer);
     document.querySelector("#custom-timer-form").addEventListener("input", validateCustomTimer);
@@ -62,6 +74,7 @@
     });
     ["post-pain", "post-discomfort"].forEach((id) => document.querySelector(`#${id}`).addEventListener("input", updateProblemExerciseVisibility));
     bindExerciseList();
+    document.querySelector("#workout-form").addEventListener("input", handleWorkoutMetaInput);
   }
 
   function bindExerciseList() {
@@ -159,6 +172,8 @@
       title: workout.title || workoutLabel(workout),
       status: workout.status || "active",
       skipped: Array.isArray(workout.skipped) ? workout.skipped : [],
+      generalWarmup: Array.isArray(workout.generalWarmup) ? workout.generalWarmup.map((item) => ({ name: item.name || "", durationMinutes: item.durationMinutes ?? null, notes: item.notes || "" })) : [],
+      workoutNotes: workout.workoutNotes || "",
       exercises: (workout.exercises || []).map((exercise) => {
         const oldSets = exercise.actualSets || [];
         const workingSets = exercise.sets || oldSets.filter((set) => set.type !== "warmup");
@@ -229,14 +244,35 @@
       renderCalendar();
       if (workout) openWorkout(workout); else openImport(date);
     }));
+    renderHistory();
   }
 
-  function openImport(date) {
+  function renderHistory() {
+    const container = document.querySelector("#workout-history");
+    if (!container) return;
+    const recent = state.workouts.slice(0, 12);
+    container.innerHTML = recent.length ? `<h2>История</h2>${recent.map((workout) => `<article class="history-card" data-workout-id="${escapeAttribute(workout.id)}"><button class="history-open" type="button"><strong>${escapeHTML(workout.title)}</strong><span>${formatCompactDate(workout.date)}</span></button><button class="history-delete" type="button" aria-label="Удалить тренировку ${escapeAttribute(workout.title)}"><i class="ph ph-trash" aria-hidden="true"></i></button></article>`).join("")}` : "";
+    container.querySelectorAll(".history-open").forEach((button) => button.addEventListener("click", () => openWorkout(state.workouts.find((item) => item.id === button.closest("[data-workout-id]").dataset.workoutId))));
+    container.querySelectorAll(".history-delete").forEach((button) => button.addEventListener("click", () => deleteWorkoutEntity(state.workouts.find((item) => item.id === button.closest("[data-workout-id]").dataset.workoutId), false)));
+  }
+
+  async function pasteWorkout() {
+    if (navigator.clipboard?.readText && window.isSecureContext) {
+      try {
+        const text = (await navigator.clipboard.readText()).trim();
+        if (text) { openImport(state.selectedDate, text); return; }
+      } catch { /* Permission denied: show the manual paste field. */ }
+    }
+    openImport(state.selectedDate);
+  }
+
+  function openImport(date, text = "") {
     state.selectedDate = date;
-    document.querySelector("#plan-text").value = "";
+    document.querySelector("#plan-text").value = text;
     document.querySelector("#import-error").textContent = "";
     document.querySelector("#import-dialog").showModal();
     requestAnimationFrame(() => document.querySelector("#plan-text").focus());
+    if (text) requestAnimationFrame(() => document.querySelector("#import-form").requestSubmit());
   }
 
   async function importPlan(event) {
@@ -248,21 +284,42 @@
     let parsed;
     try { parsed = parseImportedPlan(text, state.selectedDate); }
     catch (cause) { error.textContent = cause.message; return; }
-    if (!parsed.exercises.length) { error.textContent = "Не удалось найти упражнения. Проверьте заголовки вида «## 1. Упражнение»."; return; }
+    if (!parsed.exercises.length) { error.textContent = "Не удалось распознать упражнения. Проверь формат текста."; return; }
+    state.pendingImport = { parsed, sourceText: text };
+    document.querySelector("#preview-title").textContent = parsed.title;
+    document.querySelector("#preview-date").textContent = formatCompactDate(parsed.date);
+    document.querySelector("#preview-warmup").textContent = parsed.stats?.generalWarmup ?? parsed.generalWarmup?.length ?? 0;
+    document.querySelector("#preview-exercises").textContent = parsed.stats?.exercises ?? parsed.exercises.length;
+    document.querySelector("#preview-warmup-sets").textContent = parsed.stats?.warmupSets ?? parsed.exercises.reduce((sum, item) => sum + (item.warmupSets?.length || 0), 0);
+    document.querySelector("#preview-sets").textContent = parsed.stats?.sets ?? parsed.exercises.reduce((sum, item) => sum + (item.sets?.length || 0), 0);
+    document.querySelector("#preview-warning").textContent = parsed.warnings?.length ? "Тренировка распознана, но часть текста сохранена как заметки. Проверь тренировку после добавления." : "";
+    document.querySelector("#import-dialog").close();
+    document.querySelector("#import-preview-dialog").showModal();
+  }
+
+  async function confirmImport() {
+    if (!state.pendingImport) return;
+    const { parsed, sourceText } = state.pendingImport;
+    const error = document.querySelector("#import-error");
     const now = new Date().toISOString();
-    const workout = normalizeWorkout({ id: crypto.randomUUID(), date: parsed.date, title: parsed.title, type: parsed.type, status: "active", exercises: parsed.exercises, skipped: [], post: {}, sourceText: text, createdAt: now, updatedAt: now });
-    try { await db.put("workouts", workout); }
-    catch (cause) { error.textContent = "Не удалось сохранить тренировку на устройстве. Попробуйте ещё раз."; return; }
+    const workout = normalizeWorkout({ id: crypto.randomUUID(), date: parsed.date, title: parsed.title, type: parsed.type, status: "active", generalWarmup: parsed.generalWarmup || [], workoutNotes: parsed.workoutNotes || "", exercises: parsed.exercises, skipped: [], post: {}, sourceText, createdAt: now, updatedAt: now });
+    try { await db.saveWorkoutAndQueue(workout); }
+    catch (cause) { document.querySelector("#import-preview-dialog").close(); openImport(state.selectedDate, sourceText); error.textContent = "Не удалось сохранить тренировку на устройстве. Попробуйте ещё раз."; return; }
     await refreshWorkouts();
     state.selectedDate = workout.date;
     state.month = startOfMonth(fromISODate(workout.date));
     renderCalendar();
-    document.querySelector("#import-dialog").close();
+    document.querySelector("#import-preview-dialog").close();
+    state.pendingImport = null;
     openWorkout(workout);
+    sync.flush();
   }
 
   function parseImportedPlan(text, fallbackDate) {
-    return window.TrainingJournalImport.parseJSONPlan(text) ?? parsePlan(text, fallbackDate);
+    const json = window.TrainingJournalImport.parseJSONPlan(text);
+    if (json) return json;
+    if (/^#\s+/m.test(text) && /Рабочие:/i.test(text)) return parsePlan(text, fallbackDate);
+    return window.TrainingJournalTextImport.parseWorkoutText(text, { fallbackDate });
   }
 
   function parsePlan(text, fallbackDate) {
@@ -345,12 +402,15 @@
 
   function renderExercises() {
     const list = document.querySelector("#exercise-list");
-    list.innerHTML = state.current.exercises.map(renderExercise).join("");
+    const warmup = state.current.generalWarmup || [];
+    const warmupHTML = warmup.length ? `<section class="general-warmup"><h3>Общая разминка</h3>${warmup.map((item, index) => `<div class="warmup-item"><input data-general-warmup="${index}" data-warmup-field="name" value="${escapeAttribute(item.name || "")}" aria-label="Элемент общей разминки"><input data-general-warmup="${index}" data-warmup-field="durationMinutes" inputmode="decimal" value="${escapeAttribute(displayNumber(item.durationMinutes))}" placeholder="мин" aria-label="Минуты"><textarea data-general-warmup="${index}" data-warmup-field="notes" rows="1" placeholder="Заметка">${escapeHTML(item.notes || "")}</textarea></div>`).join("")}</section>` : "";
+    list.innerHTML = warmupHTML + state.current.exercises.map(renderExercise).join("");
     document.querySelector("#first-exercise-empty").hidden = state.current.exercises.length > 0;
     list.querySelectorAll("textarea").forEach(resizeTextarea);
   }
 
   function renderExercise(exercise, index) {
+    const warmupRows = exercise.warmupSets.map((set, setIndex) => renderSetRow(set, setIndex, "warmup")).join("");
     const rows = exercise.sets.map((set, setIndex) => renderSetRow(set, setIndex)).join("");
     const nameReadonly = exercise.name ? " readonly" : "";
     return `<article class="exercise-card" data-exercise-id="${exercise.id}">
@@ -361,6 +421,8 @@
         <button class="exercise-menu-button" type="button" data-open-menu aria-label="Меню упражнения"><i class="ph ph-dots-three" aria-hidden="true"></i></button>
       </div>
       <div class="exercise-body">
+        ${warmupRows ? `<div class="set-section-label">Разминочные подходы</div><div class="set-list warmup-set-list">${warmupRows}</div>` : ""}
+        <div class="set-section-label">Рабочие подходы</div>
         <div class="set-head"><span>Подход</span><span>Вес, кг</span><span></span><span>Повторы</span></div>
         <div class="set-list">${rows}</div>
         <button class="add-set" type="button" data-add-set>＋ Добавить подход</button>
@@ -372,14 +434,14 @@
     </article>`;
   }
 
-  function renderSetRow(set, index) {
+  function renderSetRow(set, index, kind = "working") {
     return `<div class="set-row-shell" data-set-id="${set.id}">
       <div class="set-swipe-actions"><button class="set-swipe-add" type="button" data-swipe-add>Добавить</button><button class="set-swipe-delete" type="button" data-swipe-delete>Удалить</button></div>
       <div class="set-row-main">
         <span class="set-number">${index + 1}</span>
-        <input data-kind="working" data-field="weight" inputmode="decimal" value="${escapeAttribute(set.weight)}" placeholder="${escapeAttribute(set.weightHint)}" aria-label="Вес подхода ${index + 1}">
+        <input data-kind="${kind}" data-set-id="${set.id}" data-field="weight" inputmode="decimal" value="${escapeAttribute(set.weight)}" placeholder="${escapeAttribute(set.weightHint)}" aria-label="Вес подхода ${index + 1}">
         <span class="multiply">×</span>
-        <input data-kind="working" data-field="reps" inputmode="numeric" value="${escapeAttribute(set.reps)}" placeholder="${escapeAttribute(set.repsHint)}" aria-label="Повторения подхода ${index + 1}">
+        <input data-kind="${kind}" data-set-id="${set.id}" data-field="reps" inputmode="numeric" value="${escapeAttribute(set.reps)}" placeholder="${escapeAttribute(set.repsHint)}" aria-label="Повторения подхода ${index + 1}">
       </div>
     </div>`;
   }
@@ -403,6 +465,15 @@
     }
     if (event.target.dataset.field === "weight" || event.target.dataset.field === "reps" || event.target.dataset.exerciseField) resetFinishedTimer();
     if (event.target.matches("textarea")) resizeTextarea(event.target);
+    scheduleSave();
+  }
+
+  function handleWorkoutMetaInput(event) {
+    if (!state.current || event.target.dataset.generalWarmup === undefined) return;
+    const item = state.current.generalWarmup?.[Number(event.target.dataset.generalWarmup)];
+    if (!item) return;
+    const field = event.target.dataset.warmupField;
+    item[field] = field === "durationMinutes" ? (event.target.value === "" ? null : parseLocaleNumber(event.target.value)) : event.target.value;
     scheduleSave();
   }
 
@@ -590,10 +661,72 @@
     if (!state.current) return;
     window.clearTimeout(state.autosaveTimer);
     state.current.updatedAt = new Date().toISOString();
-    await db.put("workouts", structuredClone(state.current));
+    await db.saveWorkoutAndQueue(structuredClone(state.current));
     document.querySelector("#save-state").textContent = "Сохранено локально";
     await refreshWorkouts();
     renderCalendar();
+    sync.queueState();
+    sync.flush();
+  }
+
+  async function deleteCurrentWorkout() {
+    if (state.current) await deleteWorkoutEntity(state.current, true);
+  }
+
+  async function deleteWorkoutEntity(target, closeCurrent) {
+    if (!target || !window.confirm(`Удалить «${target.title}» за ${formatCompactDate(target.date)}?\n\nБудут удалены план, упражнения, подходы, результаты и заметки. Это действие нельзя отменить.`)) return;
+    window.clearTimeout(state.autosaveTimer);
+    const workout = structuredClone(target);
+    workout.updatedAt = new Date().toISOString();
+    try {
+      await db.deleteWorkout(workout);
+      if (closeCurrent || state.current?.id === workout.id) {
+        state.current = null;
+        if (document.querySelector("#workout-dialog").open) document.querySelector("#workout-dialog").close();
+      }
+      await refreshWorkouts();
+      renderCalendar();
+      await sync.queueState();
+      sync.flush();
+    } catch (error) {
+      console.error(error);
+      document.querySelector("#save-state").textContent = "Не удалось удалить тренировку с устройства";
+    }
+  }
+
+  async function openSyncSettings() {
+    const current = await sync.config();
+    document.querySelector("#sync-api-url").value = current.apiUrl || "";
+    document.querySelector("#sync-token").value = current.token || "";
+    document.querySelector("#sync-settings-state").textContent = "";
+    document.querySelector("#sync-settings-dialog").showModal();
+  }
+
+  async function saveSyncSettings(event) {
+    event.preventDefault();
+    const apiUrl = document.querySelector("#sync-api-url").value;
+    const token = document.querySelector("#sync-token").value;
+    await sync.saveConfig(apiUrl, token);
+    document.querySelector("#sync-settings-dialog").close();
+    sync.flush();
+  }
+
+  async function testSyncSettings() {
+    const output = document.querySelector("#sync-settings-state");
+    output.textContent = "Проверяю…";
+    try {
+      await sync.testConnection(document.querySelector("#sync-api-url").value, document.querySelector("#sync-token").value);
+      output.textContent = "Соединение работает.";
+    } catch (error) { output.textContent = `Не удалось подключиться: ${error.message}`; }
+  }
+
+  function updateSyncState(event) {
+    const labels = {
+      pending: event.detail.pending ? `Ожидает синхронизации · ${event.detail.pending}` : "Ожидает синхронизации",
+      synced: "Синхронизировано",
+      error: "Ошибка синхронизации — данные сохранены на устройстве",
+    };
+    document.querySelector("#sync-state").textContent = labels[event.detail.status] || "Сохранено на устройстве";
   }
 
   async function closeDialog(id) {
@@ -644,25 +777,30 @@
   }
 
   function buildSummary(workout) {
-    const lines = [`# ${workout.title}`, ``, `📅 ${formatCompactDate(workout.date)}`, ``];
+    const lines = [workout.title, formatFullDate(workout.date), ""];
+    if (workout.generalWarmup?.length) {
+      lines.push("Разминка");
+      workout.generalWarmup.forEach((item) => lines.push(item.durationMinutes !== null && item.durationMinutes !== undefined ? `${item.name} — ${item.durationMinutes} мин` : `${item.name}${item.notes && item.notes !== item.name ? ` — ${item.notes}` : ""}`));
+      lines.push("");
+    }
     const completedExercises = workout.exercises.filter((exercise) => {
       const hasWarmup = exercise.warmupSets.some(hasSetValue);
       const hasWorkingSet = exercise.sets.some(hasSetValue);
       return exercise.name && (hasWarmup || hasWorkingSet || displayNumber(exercise.durationMinutes) !== "" || exercise.rpe !== "" || exercise.notes);
     });
     completedExercises.forEach((exercise, index) => {
-      lines.push(`## ${index + 1}. ${exercise.name}`, "");
+      lines.push(`${index + 1}. ${exercise.name}`);
       exercise.warmupSets.filter(hasSetValue).forEach((set) => lines.push(`Разминка: ${formatSet(set)}`));
-      exercise.sets.filter(hasSetValue).forEach((set, setIndex) => lines.push(`${setIndex + 1}. ${formatSet(set)}`));
+      exercise.sets.filter(hasSetValue).forEach((set) => lines.push(formatSet(set)));
       if (displayNumber(exercise.durationMinutes) !== "") lines.push(`Длительность: ${displayNumber(exercise.durationMinutes)} мин`);
       if (exercise.instruction) lines.push(`Уточнение: ${exercise.instruction}`);
-      if (exercise.rpe !== "") lines.push(`RPE: ${exercise.rpe}`);
-      if (exercise.notes) lines.push(`Заметка: ${exercise.notes}`);
+      if (exercise.rpe !== "") lines.push(`RPE ${exercise.rpe}`);
+      if (exercise.notes) lines.push(exercise.notes);
       lines.push("");
     });
-    lines.push("### Поясница после тренировки", "");
-    lines.push(`Боль: ${workout.post.pain || 0}/10`);
-    lines.push(`Дискомфорт: ${workout.post.discomfort || 0}/10`);
+    if (workout.workoutNotes) lines.push("Заметки:", workout.workoutNotes, "");
+    lines.push(`Поясница — боль: ${workout.post.pain || 0}/10`);
+    lines.push(`Поясница — дискомфорт: ${workout.post.discomfort || 0}/10`);
     if (workout.post.mobility) lines.push(`Мобильность: ${mobilityLabel(workout.post.mobility)}`);
     if (workout.post.problemExercise) lines.push(`Проблемное упражнение: ${workout.post.problemExercise}`);
     const finalNotes = [];
@@ -674,9 +812,14 @@
   }
 
   function formatSet(set) {
-    if (set.weight !== "" && set.reps !== "") return `${set.weight} кг × ${set.reps} повторений`;
+    if (set.weight !== "" && set.reps !== "") return `${set.weight} кг x ${set.reps}`;
     if (set.weight !== "") return `${set.weight} кг`;
     return `${set.reps} повторений`;
+  }
+
+  function formatFullDate(value) {
+    const [year, month, day] = value.split("-");
+    return `${day}.${month}.${year}`;
   }
 
   function hasSetValue(set) { return set.weight !== "" || set.reps !== ""; }

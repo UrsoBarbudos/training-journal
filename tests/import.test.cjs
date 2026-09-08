@@ -40,7 +40,8 @@ test('точное число подходов, отдельная размин�
   assert.deepEqual(plain(app.normalizeWorkout(result)), plain(result));
   assert.match(app.buildSummary(result), /Длительность: 25 мин/);
   const firstHTML = app.renderExercise(result.exercises[0], 0);
-  assert.equal((firstHTML.match(/class="set-row-shell"/g) || []).length, 4);
+  assert.equal((firstHTML.match(/class="set-row-shell"/g) || []).length, 5);
+  assert.match(firstHTML, /Разминочные подходы/);
   assert.match(firstHTML, /value="23"/);
   assert.match(firstHTML, /value="15"/);
   const trxHTML = app.renderExercise(result.exercises[1], 1);

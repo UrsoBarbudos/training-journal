@@ -16,15 +16,17 @@
   <body>
     <div class="app-shell">
       <header class="home-header">
-        <p class="brand-mark">TJ / 01</p>
-        <h1>Журнал тренировок</h1>
+        <div><p class="brand-mark">TJ / 01</p><h1>Журнал тренировок</h1></div>
+        <button id="open-sync-settings" class="icon-button" type="button" aria-label="Настройки синхронизации"><i class="ph ph-gear" aria-hidden="true"></i></button>
       </header>
+      <div class="sync-bar"><button id="sync-now" type="button"><span id="sync-state">Сохранено на устройстве</span><i class="ph ph-arrows-clockwise" aria-hidden="true"></i></button></div>
       <main id="app" tabindex="-1">
         <section aria-labelledby="calendar-title">
           <div id="calendar"></div>
           <button id="new-workout" class="button button-primary home-cta" type="button">
-            <i class="ph ph-plus" aria-hidden="true"></i>Новая тренировка
+            <i class="ph ph-clipboard-text" aria-hidden="true"></i>Вставить тренировку
           </button>
+          <section id="workout-history" class="workout-history" aria-label="История тренировок"></section>
         </section>
       </main>
     </div>
@@ -33,15 +35,32 @@
       <form id="import-form" class="sheet-content">
         <div class="sheet-handle" aria-hidden="true"></div>
         <div class="sheet-heading">
-          <div><p class="eyebrow">Новая тренировка</p><h2>Вставьте план из чата</h2></div>
+          <div><p class="eyebrow">Новая тренировка</p><h2>Вставьте тренировку</h2></div>
           <button class="icon-button" type="button" data-close="import-dialog" aria-label="Закрыть"><i class="ph ph-x" aria-hidden="true"></i></button>
         </div>
         <label class="field-label" for="plan-text">План тренировки</label>
-        <textarea id="plan-text" rows="12" placeholder="Вставьте JSON тренировки из ChatGPT или старый текстовый план." aria-describedby="import-hint"></textarea>
-        <p id="import-hint" class="eyebrow">Вставьте JSON тренировки из ChatGPT или старый текстовый план.</p>
+        <textarea id="plan-text" rows="12" placeholder="Вставьте обычный текст тренировки из ChatGPT." aria-describedby="import-hint"></textarea>
+        <p id="import-hint" class="eyebrow">Название, дата, разминка, упражнения и подходы будут распознаны автоматически.</p>
         <p id="import-error" class="form-error" aria-live="assertive"></p>
-        <button class="button button-primary" type="submit">Добавить тренировку</button>
+        <button class="button button-primary" type="submit">Продолжить</button>
       </form>
+    </dialog>
+
+    <dialog id="import-preview-dialog" class="sheet-dialog">
+      <div class="sheet-content">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <div class="sheet-heading"><div><p class="eyebrow">Проверка импорта</p><h2 id="preview-title"></h2></div></div>
+        <p id="preview-date"></p>
+        <dl class="import-stats">
+          <div><dt>Общая разминка</dt><dd id="preview-warmup"></dd></div>
+          <div><dt>Упражнений</dt><dd id="preview-exercises"></dd></div>
+          <div><dt>Разминочных подходов</dt><dd id="preview-warmup-sets"></dd></div>
+          <div><dt>Рабочих подходов</dt><dd id="preview-sets"></dd></div>
+        </dl>
+        <p id="preview-warning" class="form-warning"></p>
+        <button id="confirm-import" class="button button-primary" type="button">Добавить тренировку</button>
+        <button class="button button-secondary" type="button" data-close="import-preview-dialog">Отмена</button>
+      </div>
     </dialog>
 
     <dialog id="workout-dialog" class="workout-dialog">
@@ -71,7 +90,24 @@
           <button id="add-first-exercise" class="button button-secondary" type="button">Добавить первое упражнение</button>
         </section>
         <p id="save-state" class="save-state" aria-live="polite"></p>
+        <button id="delete-workout" class="delete-workout" type="button">Удалить тренировку</button>
         <button id="finish-workout" class="finish-workout" type="submit">Завершить тренировку</button>
+      </form>
+    </dialog>
+
+    <dialog id="sync-settings-dialog" class="sheet-dialog">
+      <form id="sync-settings-form" class="sheet-content">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <div class="sheet-heading">
+          <div><p class="eyebrow">Серверная копия</p><h2>Синхронизация</h2></div>
+          <button class="icon-button" type="button" data-close="sync-settings-dialog" aria-label="Закрыть"><i class="ph ph-x" aria-hidden="true"></i></button>
+        </div>
+        <label>API URL<input id="sync-api-url" type="url" inputmode="url" placeholder="https://example.com" autocomplete="url"></label>
+        <label>Bearer-токен<input id="sync-token" type="password" autocomplete="off" placeholder="Токен API"></label>
+        <p class="security-note">Токен хранится локально на этом устройстве. PIN защищает только интерфейс и не является серверной авторизацией.</p>
+        <p id="sync-settings-state" class="form-error" aria-live="polite"></p>
+        <button id="test-sync" class="button button-secondary" type="button">Проверить соединение</button>
+        <button class="button button-primary" type="submit">Сохранить настройки</button>
       </form>
     </dialog>
 
@@ -127,7 +163,7 @@
           <button class="icon-button" type="button" data-close="summary-dialog" aria-label="Закрыть"><i class="ph ph-x" aria-hidden="true"></i></button>
         </div>
         <textarea id="summary-text" rows="18" readonly></textarea>
-        <button id="copy-summary" class="button button-primary" type="button"><i class="ph ph-copy" aria-hidden="true"></i>Копировать журнал</button>
+        <button id="copy-summary" class="button button-primary" type="button"><i class="ph ph-copy" aria-hidden="true"></i>Скопировать результат</button>
         <p id="copy-state" class="copy-state" aria-live="polite"></p>
       </div>
     </dialog>
@@ -147,6 +183,8 @@
 
     <script src="./db.js"></script>
     <script src="./plan-import.js"></script>
+    <script src="./text-import.js"></script>
+    <script src="./sync.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>
